@@ -25,12 +25,20 @@ Pod::Spec.new do |s|
   # so '../../../..' goes up to the app's ios/ directory.
   app_ios = File.expand_path('../../../..', __FILE__)
   app_frameworks = File.join(app_ios, 'Frameworks')
+
   if File.exist?("#{app_frameworks}/GoogleHomeSDK.xcframework") &&
      File.exist?("#{app_frameworks}/GoogleHomeTypes.xcframework")
     s.vendored_frameworks = [
       "#{app_frameworks}/GoogleHomeSDK.xcframework",
       "#{app_frameworks}/GoogleHomeTypes.xcframework"
     ]
+
+    # Expose framework search path to ALL targets (Runner + MatterExtension)
+    # so that `import GoogleHomeSDK` compiles without manual Xcode settings.
+    s.user_target_xcconfig = {
+      'FRAMEWORK_SEARCH_PATHS' => "$(inherited) #{app_frameworks}/GoogleHomeSDK.xcframework/ios-arm64 #{app_frameworks}/GoogleHomeSDK.xcframework/ios-arm64-simulator",
+      'OTHER_LDFLAGS' => '$(inherited) -framework GoogleHomeSDK'
+    }
   end
 
   # System frameworks required

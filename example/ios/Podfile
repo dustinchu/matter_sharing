@@ -1,6 +1,5 @@
 platform :ios, '16.1'
 
-# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -35,8 +34,87 @@ target 'Runner' do
   end
 end
 
+target 'MatterExtension' do
+  use_frameworks!
+  inherit! :search_paths
+end
+
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+  end
+
+  ios_dir = File.dirname(File.realpath(__FILE__))
+  gh_sdk_arm64 = File.join(ios_dir, 'Frameworks', 'GoogleHomeSDK.xcframework', 'ios-arm64', 'GoogleHomeSDK.framework')
+  gh_sdk_sim   = File.join(ios_dir, 'Frameworks', 'GoogleHomeSDK.xcframework', 'ios-arm64-simulator', 'GoogleHomeSDK.framework')
+
+  # Patch frameworks.sh to embed GoogleHomeSDK directly from app ios/Frameworks/
+  pods_runner_dir = File.join(installer.sandbox.root, 'Target Support Files', 'Pods-Runner')
+  frameworks_script = File.join(pods_runner_dir, 'Pods-Runner-frameworks.sh')
+  if File.exist?(frameworks_script)
+    content = File.read(frameworks_script)
+    unless content.include?('GoogleHomeSDK')
+      # Insert after matter_sharing.framework embed line, use ARCHS to pick correct slice
+      inject = <<~BASH
+
+        # matter_sharing: embed GoogleHomeSDK from app ios/Frameworks/
+        if [[ "$ARCHS" == *"arm64"* ]] && [[ "$PLATFORM_NAME" != *"simulator"* ]]; then
+          install_framework "#{gh_sdk_arm64}"
+        else
+          install_framework "#{gh_sdk_sim}"
+        fi
+      BASH
+      content = content.sub(/^if \[ "\$\{COCOAPODS_PARALLEL_CODE_SIGN\}"/, inject + 'if ["${COCOAPODS_PARALLEL_CODE_SIGN}"')
+      File.write(frameworks_script, content)
+      puts '[matter_sharing] Patched Pods-Runner-frameworks.sh to embed GoogleHomeSDK'
+    end
+  end
+
+  # Patch MatterExtension xcconfig to find GoogleHomeSDK for compilation
+  pods_extension_dir = File.join(installer.sandbox.root, 'Target Support Files', 'Pods-MatterExtension')
+  if Dir.exist?(pods_extension_dir)
+    ['debug', 'profile', 'release'].each do |config|
+      xcconfig_path = File.join(pods_extension_dir, "Pods-MatterExtension.#{config}.xcconfig")
+      next unless File.exist?(xcconfig_path)
+      content = File.read(xcconfig_path)
+      unless content.include?('GoogleHomeSDK')
+        content += "\nFRAMEWORK_SEARCH_PATHS = $(inherited) #{gh_sdk_arm64.delete_suffix('/GoogleHomeSDK.framework')} #{gh_sdk_sim.delete_suffix('/GoogleHomeSDK.framework')}"
+        content += "\nOTHER_LDFLAGS = $(inherited) -framework GoogleHomeSDK"
+        File.write(xcconfig_path, content)
+        puts "[matter_sharing] Patched Pods-MatterExtension.#{config}.xcconfig"
+      end
+    end
+  end
+
+  # Auto-setup MatterExtension files from plugin template
+  extension_dir = File.join(ios_dir, 'MatterExtension')
+  template_dir = Dir.glob(File.join(ios_dir, '.symlinks', 'plugins', 'matter_sharing', 'ios', 'MatterExtensionTemplate')).first
+  next unless template_dir
+
+  entitlements_path = File.join(ios_dir, 'Runner', 'Runner.entitlements')
+  app_group = nil
+  if File.exist?(entitlements_path)
+    match = File.read(entitlements_path).match(/<key>com\.apple\.security\.application-groups<\/key>\s*<array>\s*<string>(.*?)<\/string>/)
+    app_group = match[1] if match
+  end
+
+  unless app_group
+    puts '[matter_sharing] Warning: App Group not found in Runner.entitlements - skipping MatterExtension setup'
+    next
+  end
+
+  FileUtils.mkdir_p(extension_dir)
+
+  {
+    'RequestHandler.swift'      => 'RequestHandler.swift',
+    'Info.plist.template'       => 'Info.plist',
+    'MatterExtension.entitlements' => 'MatterExtension.entitlements'
+  }.each do |src_name, dst_name|
+    src = File.join(template_dir, src_name)
+    dst = File.join(extension_dir, dst_name)
+    next unless File.exist?(src)
+    next if File.exist?(dst)
+    File.write(dst, File.read(src).gsub('group.YOUR_BUNDLE_ID', app_group))
+    puts "[matter_sharing] Created #{dst_name} with App Group: #{app_group}"
   end
 end
