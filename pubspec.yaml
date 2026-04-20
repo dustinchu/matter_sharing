@@ -9,7 +9,7 @@ issue_tracker: https://github.com/dustinchu/matter_sharing/issues
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
-  flutter: ">=3.22.0"
+  flutter: ">=3.41.0"
 
 dependencies:
   flutter:
