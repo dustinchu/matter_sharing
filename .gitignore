@@ -1,0 +1,10 @@
+.dart_tool/
+pubspec.lock
+android/.gradle/
+*.iml
+.idea/
+build/
+
+# Google Home SDK - too large for git, download manually (see SETUP_IOS.md)
+ios/Frameworks/
+example/ios/Frameworks

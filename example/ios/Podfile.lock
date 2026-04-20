@@ -1,0 +1,22 @@
+PODS:
+  - Flutter (1.0.0)
+  - matter_sharing (0.1.0):
+    - Flutter
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - matter_sharing (from `.symlinks/plugins/matter_sharing/ios`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  matter_sharing:
+    :path: ".symlinks/plugins/matter_sharing/ios"
+
+SPEC CHECKSUMS:
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  matter_sharing: a326ddb8f292697b2d8b5989e9bebc959c5a2cb5
+
+PODFILE CHECKSUM: c0f18dca8a318959ff55feda96aedc4ebfd52222
+
+COCOAPODS: 1.16.2

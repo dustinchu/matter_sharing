@@ -1,0 +1,40 @@
+name: matter_sharing
+description: >-
+  Share Matter smart home devices to Apple Home and Google Home from Flutter.
+  Supports iOS and Android with a simple unified API.
+version: 0.1.0
+homepage: https://github.com/dustinchu/matter_sharing
+repository: https://github.com/dustinchu/matter_sharing
+issue_tracker: https://github.com/dustinchu/matter_sharing/issues
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  plugin:
+    platforms:
+      ios:
+        pluginClass: MatterSharingPlugin
+        minIosVersion: "16.1"
+      android:
+        package: com.dustinchu.matter_sharing
+        pluginClass: MatterSharingPlugin
+        minSdkVersion: 27
+
+topics:
+  - matter
+  - smart-home
+  - iot
+  - google-home
+  - apple-home
