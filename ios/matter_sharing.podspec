@@ -15,32 +15,6 @@ Pod::Spec.new do |s|
   s.platform         = :ios, '16.1'
   s.swift_version    = '5.9'
 
-  # Google Home SDK xcframeworks must be placed in your app's ios/Frameworks/ directory:
-  #   YOUR_APP/ios/Frameworks/GoogleHomeSDK.xcframework
-  #   YOUR_APP/ios/Frameworks/GoogleHomeTypes.xcframework
-  # See: https://github.com/dustinchu/matter_sharing/blob/main/SETUP_IOS.md
-  #
-  # During pod install, __FILE__ resolves to:
-  #   ios/.symlinks/plugins/matter_sharing/ios/matter_sharing.podspec
-  # so '../../../..' goes up to the app's ios/ directory.
-  app_ios = File.expand_path('../../../..', __FILE__)
-  app_frameworks = File.join(app_ios, 'Frameworks')
-
-  if File.exist?("#{app_frameworks}/GoogleHomeSDK.xcframework") &&
-     File.exist?("#{app_frameworks}/GoogleHomeTypes.xcframework")
-    s.vendored_frameworks = [
-      "#{app_frameworks}/GoogleHomeSDK.xcframework",
-      "#{app_frameworks}/GoogleHomeTypes.xcframework"
-    ]
-
-    # Expose framework search path to ALL targets (Runner + MatterExtension)
-    # so that `import GoogleHomeSDK` compiles without manual Xcode settings.
-    s.user_target_xcconfig = {
-      'FRAMEWORK_SEARCH_PATHS' => "$(inherited) #{app_frameworks}/GoogleHomeSDK.xcframework/ios-arm64 #{app_frameworks}/GoogleHomeSDK.xcframework/ios-arm64-simulator",
-      'OTHER_LDFLAGS' => '$(inherited) -framework GoogleHomeSDK'
-    }
-  end
-
   # System frameworks required
   s.frameworks = 'MatterSupport', 'Matter', 'HomeKit'
 

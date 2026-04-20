@@ -70,6 +70,43 @@ post_install do |installer|
     end
   end
 
+  gh_sdk_search_paths = "#{gh_sdk_arm64.delete_suffix('/GoogleHomeSDK.framework')} #{gh_sdk_sim.delete_suffix('/GoogleHomeSDK.framework')}"
+
+  # Patch matter_sharing pod xcconfig so GoogleHomeSharing.swift can canImport(GoogleHomeSDK)
+  pods_matter_sharing_dir = File.join(installer.sandbox.root, 'Target Support Files', 'matter_sharing')
+  ['debug', 'profile', 'release'].each do |config|
+    xcconfig_path = File.join(pods_matter_sharing_dir, "matter_sharing.#{config}.xcconfig")
+    next unless File.exist?(xcconfig_path)
+    content = File.read(xcconfig_path)
+    unless content.include?('GoogleHomeSDK')
+      if content =~ /^FRAMEWORK_SEARCH_PATHS = /
+        content = content.sub(/^(FRAMEWORK_SEARCH_PATHS = .*)$/, "\\1 #{gh_sdk_search_paths}")
+      else
+        content += "\nFRAMEWORK_SEARCH_PATHS = $(inherited) #{gh_sdk_search_paths}"
+      end
+      File.write(xcconfig_path, content)
+      puts "[matter_sharing] Patched matter_sharing.#{config}.xcconfig for GoogleHomeSDK"
+    end
+  end
+
+  # Patch Runner xcconfig to find GoogleHomeSDK for compilation (canImport check)
+  pods_runner_dir2 = File.join(installer.sandbox.root, 'Target Support Files', 'Pods-Runner')
+  ['debug', 'profile', 'release'].each do |config|
+    xcconfig_path = File.join(pods_runner_dir2, "Pods-Runner.#{config}.xcconfig")
+    next unless File.exist?(xcconfig_path)
+    content = File.read(xcconfig_path)
+    unless content.include?('GoogleHomeSDK')
+      # Append to existing FRAMEWORK_SEARCH_PATHS line to avoid duplicate key (last-wins in xcconfig)
+      if content =~ /^FRAMEWORK_SEARCH_PATHS = /
+        content = content.sub(/^(FRAMEWORK_SEARCH_PATHS = .*)$/, "\\1 #{gh_sdk_search_paths}")
+      else
+        content += "\nFRAMEWORK_SEARCH_PATHS = $(inherited) #{gh_sdk_search_paths}"
+      end
+      File.write(xcconfig_path, content)
+      puts "[matter_sharing] Patched Pods-Runner.#{config}.xcconfig for GoogleHomeSDK"
+    end
+  end
+
   # Patch MatterExtension xcconfig to find GoogleHomeSDK for compilation
   pods_extension_dir = File.join(installer.sandbox.root, 'Target Support Files', 'Pods-MatterExtension')
   if Dir.exist?(pods_extension_dir)
@@ -78,7 +115,11 @@ post_install do |installer|
       next unless File.exist?(xcconfig_path)
       content = File.read(xcconfig_path)
       unless content.include?('GoogleHomeSDK')
-        content += "\nFRAMEWORK_SEARCH_PATHS = $(inherited) #{gh_sdk_arm64.delete_suffix('/GoogleHomeSDK.framework')} #{gh_sdk_sim.delete_suffix('/GoogleHomeSDK.framework')}"
+        if content =~ /^FRAMEWORK_SEARCH_PATHS = /
+          content = content.sub(/^(FRAMEWORK_SEARCH_PATHS = .*)$/, "\\1 #{gh_sdk_search_paths}")
+        else
+          content += "\nFRAMEWORK_SEARCH_PATHS = $(inherited) #{gh_sdk_search_paths}"
+        end
         content += "\nOTHER_LDFLAGS = $(inherited) -framework GoogleHomeSDK"
         File.write(xcconfig_path, content)
         puts "[matter_sharing] Patched Pods-MatterExtension.#{config}.xcconfig"
