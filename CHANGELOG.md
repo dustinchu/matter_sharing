@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- docs: Add `alreadyCommissioned` error code to README error table and example.
+
 ## 0.1.2
 
 - iOS: Fix double Google sign-in prompt on first install by pre-warming `prepareForMatterCommissioning` after session restore.

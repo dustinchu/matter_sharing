@@ -163,6 +163,9 @@ try {
     case MatterSharingErrorCode.noStructure:
       // No Google Home found - user needs to set up a home in the Google Home app
       break;
+    case MatterSharingErrorCode.alreadyCommissioned:
+      // Device already added to this Google Home - remove it first
+      break;
     case MatterSharingErrorCode.commissionFailed:
       // Commissioning failed - check e.message and e.details for native error
       break;
@@ -182,6 +185,7 @@ try {
 | `notConfigured` | `NOT_CONFIGURED` | iOS | Google Home SDK not configured |
 | `sdkNotLinked` | `SDK_NOT_LINKED` | iOS | GoogleHomeSDK not available |
 | `noStructure` | `NO_STRUCTURE` | iOS | No Google Home structure found |
+| `alreadyCommissioned` | `ALREADY_COMMISSIONED` | iOS | Device already added to this Google Home |
 | `commissionFailed` | `COMMISSION_FAILED` | iOS | Google Home commissioning failed |
 | `appleHomeFailed` | `SHARE_FAILED` | iOS | Apple Home sharing failed |
 | `googleHomeError` | `GOOGLE_HOME_ERROR` | Android | Google Play Services error |
