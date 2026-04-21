@@ -28,6 +28,12 @@ enum MatterSharingErrorCode {
   /// - The Google Home app home is owned by a different Google account.
   commissionFailed,
 
+  /// Device has already been added to this Google Home.
+  ///
+  /// The device is already commissioned to the same home. Remove it from
+  /// the Google Home app first before adding it again.
+  alreadyCommissioned,
+
   /// General error (sign-in cancelled, network error, etc).
   error,
 
@@ -75,6 +81,7 @@ class MatterSharingException implements Exception {
       'NOT_CONFIGURED' => MatterSharingErrorCode.notConfigured,
       'NO_STRUCTURE' => MatterSharingErrorCode.noStructure,
       'COMMISSION_FAILED' => MatterSharingErrorCode.commissionFailed,
+      'ALREADY_COMMISSIONED' => MatterSharingErrorCode.alreadyCommissioned,
       'ERROR' => MatterSharingErrorCode.error,
       'SDK_NOT_LINKED' => MatterSharingErrorCode.sdkNotLinked,
       'APPLE_HOME_FAILED' => MatterSharingErrorCode.appleHomeFailed,

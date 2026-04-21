@@ -21,6 +21,8 @@ class GoogleHomeSharing {
   #if canImport(GoogleHomeSDK)
   private var cachedHome: Home?
   private var activeStructure: Structure?
+  // Tracks the in-flight prepareForMatterCommissioning task so we don't call it twice
+  private var prepareTask: Task<Structure, Error>?
   #endif
 
   private init() {}
@@ -33,7 +35,7 @@ class GoogleHomeSharing {
     self.isConfigured = true
 
     #if canImport(GoogleHomeSDK)
-    DispatchQueue.main.async {
+    Task { @MainActor in
       Home.configure {
         $0.teamID = teamID
         $0.clientID = clientID
@@ -41,6 +43,27 @@ class GoogleHomeSharing {
         $0.sharedAppGroup = appGroup
       }
       NSLog("[GoogleHomeSharing] Home.configure() done")
+      // Eagerly restore session on app launch so connect() is not needed when user taps share
+      if cachedHome == nil {
+        cachedHome = await Home.restoreSession()
+        if let home = cachedHome {
+          NSLog("[GoogleHomeSharing] Session restored on configure")
+          // Warm up: fetch structures to surface any permission issues early
+          if let structures = try? await home.structures().list() {
+            NSLog("[GoogleHomeSharing] Warm-up structures count: %d", structures.count)
+            if let structure = structures.first {
+              // Pre-run prepareForMatterCommissioning so the OAuth scope is already granted
+              // before the user taps share, avoiding a second auth prompt at tap time.
+              prepareTask = Task {
+                NSLog("[GoogleHomeSharing] Pre-warming prepareForMatterCommissioning")
+                try await structure.prepareForMatterCommissioning()
+                NSLog("[GoogleHomeSharing] Pre-warm done")
+                return structure
+              }
+            }
+          }
+        }
+      }
     }
     #else
     NSLog("[GoogleHomeSharing] GoogleHomeSDK not linked - configure() is a no-op")
@@ -107,8 +130,25 @@ class GoogleHomeSharing {
           activeStructure = nil
         }
 
-        try await structure.prepareForMatterCommissioning()
-        activeStructure = structure
+        // Use the pre-warmed prepare result if available for the same structure,
+        // otherwise call prepareForMatterCommissioning now (this may show a second auth prompt
+        // on first install, but is unavoidable without a pre-warm).
+        if let task = prepareTask {
+          prepareTask = nil
+          let preWarmedStructure = try await task.value
+          // Only reuse if it's the same structure
+          if preWarmedStructure == structure {
+            NSLog("[GoogleHomeSharing] Using pre-warmed commissioning session")
+            activeStructure = preWarmedStructure
+          } else {
+            NSLog("[GoogleHomeSharing] Structure mismatch, calling prepareForMatterCommissioning")
+            try await structure.prepareForMatterCommissioning()
+            activeStructure = structure
+          }
+        } else {
+          try await structure.prepareForMatterCommissioning()
+          activeStructure = structure
+        }
         NSLog("[GoogleHomeSharing] prepareForMatterCommissioning done")
 
         let topology = MatterAddDeviceRequest.Topology(
@@ -140,23 +180,38 @@ class GoogleHomeSharing {
         } catch {
           _ = structure.markMatterCommissioningFailed(error: error)
           activeStructure = nil
-          result(FlutterError(
-            code: "COMMISSION_FAILED",
-            message: """
-            Commissioning failed: \(error.localizedDescription)
+          let nsErr = error as NSError
+          // HFErrorDomain Code=33: device already associated to this home
+          // MatterSupport error 1 wrapping HFErrorDomain 33: same duplicate case
+          let isDuplicate = (nsErr.domain == "HFErrorDomain" && nsErr.code == 33)
+            || (nsErr.userInfo[NSUnderlyingErrorKey] as? NSError).map {
+                $0.domain == "HFErrorDomain" && $0.code == 33
+               } ?? false
+          if isDuplicate {
+            result(FlutterError(
+              code: "ALREADY_COMMISSIONED",
+              message: "This device has already been added to Google Home. Please remove it from the Google Home app first before adding again.",
+              details: ["domain": nsErr.domain, "code": nsErr.code]
+            ))
+          } else {
+            result(FlutterError(
+              code: "COMMISSION_FAILED",
+              message: """
+              Commissioning failed: \(error.localizedDescription)
 
-            Possible causes:
-            1. You are not the Google Home owner - only the home owner can add new devices.
-            2. The device has reached the maximum number of supported fabrics and cannot join another home.
-            3. A Bluetooth or network issue interrupted commissioning - move closer to the device and try again.
-            4. The Google Home in the app belongs to a different Google account than the one signed in.
-            """,
-            details: [
-              "domain": (error as NSError).domain,
-              "code": (error as NSError).code,
-              "underlyingError": (error as NSError).userInfo[NSUnderlyingErrorKey].map { "\($0)" } ?? "none"
-            ]
-          ))
+              Possible causes:
+              1. You are not the Google Home owner - only the home owner can add new devices.
+              2. The device has reached the maximum number of fabrics and cannot join another home.
+              3. A Bluetooth or network issue interrupted commissioning - move closer to the device and try again.
+              4. The Google Home in the app belongs to a different Google account than the one signed in.
+              """,
+              details: [
+                "domain": nsErr.domain,
+                "code": nsErr.code,
+                "underlyingError": nsErr.userInfo[NSUnderlyingErrorKey].map { "\($0)" } ?? "none"
+              ]
+            ))
+          }
         }
 
       } catch {
