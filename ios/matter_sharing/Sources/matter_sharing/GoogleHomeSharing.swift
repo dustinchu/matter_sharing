@@ -140,6 +140,15 @@ class GoogleHomeSharing {
         } catch {
           _ = structure.markMatterCommissioningFailed(error: error)
           activeStructure = nil
+          if Self.isUserCancelled(error) {
+            NSLog("[GoogleHomeSharing] User cancelled commissioning UI")
+            result(FlutterError(
+              code: "CANCELLED",
+              message: "User cancelled Google Home commissioning.",
+              details: nil
+            ))
+            return
+          }
           result(FlutterError(
             code: "COMMISSION_FAILED",
             message: """
@@ -162,6 +171,15 @@ class GoogleHomeSharing {
       } catch {
         activeStructure?.markMatterCommissioningFailed(error: error)
         activeStructure = nil
+        if Self.isUserCancelled(error) {
+          NSLog("[GoogleHomeSharing] User cancelled (outer)")
+          result(FlutterError(
+            code: "CANCELLED",
+            message: "User cancelled Google Home commissioning.",
+            details: nil
+          ))
+          return
+        }
         cachedHome = nil
         NSLog("[GoogleHomeSharing] Error: %@", error.localizedDescription)
         result(FlutterError(
@@ -188,4 +206,35 @@ class GoogleHomeSharing {
     return MatterCommissioningUtils.matterSetupPayload(from: payload)
   }
   #endif
+
+  /// Detects whether an error represents a user-initiated cancellation of the
+  /// system commissioning UI. Walks the underlying error chain because
+  /// MatterSupport and GoogleHomeSDK frequently wrap the original cancel error.
+  static func isUserCancelled(_ error: Error) -> Bool {
+    var current: NSError? = error as NSError
+    while let err = current {
+      // NSUserCancelledError (Cocoa) - generic user-cancel
+      if err.domain == NSCocoaErrorDomain && err.code == NSUserCancelledError {
+        return true
+      }
+      // MatterSupport framework cancel
+      if err.domain.contains("MatterSupport") && err.code == 1 {
+        return true
+      }
+      // HomeKit operation cancelled (HMErrorCodeOperationCancelled = 38)
+      if err.domain == "HMErrorDomain" && err.code == 38 {
+        return true
+      }
+      // Generic POSIX ECANCELED
+      if err.domain == NSPOSIXErrorDomain && err.code == 89 {
+        return true
+      }
+      // Google Home SDK often returns domain "com.google.home" with cancel codes,
+      // but the SDK also forwards Cocoa NSUserCancelledError through userInfo.
+      current = err.userInfo[NSUnderlyingErrorKey] as? NSError
+    }
+    // Fallback: localized description contains "cancel"
+    let msg = (error as NSError).localizedDescription.lowercased()
+    return msg.contains("cancel")
+  }
 }

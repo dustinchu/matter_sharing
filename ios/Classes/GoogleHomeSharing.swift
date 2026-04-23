@@ -193,6 +193,13 @@ class GoogleHomeSharing {
               message: "This device has already been added to Google Home. Please remove it from the Google Home app first before adding again.",
               details: ["domain": nsErr.domain, "code": nsErr.code]
             ))
+          } else if Self.isUserCancelled(error) {
+            NSLog("[GoogleHomeSharing] User cancelled commissioning UI")
+            result(FlutterError(
+              code: "CANCELLED",
+              message: "User cancelled Google Home commissioning.",
+              details: nil
+            ))
           } else {
             result(FlutterError(
               code: "COMMISSION_FAILED",
@@ -217,6 +224,15 @@ class GoogleHomeSharing {
       } catch {
         activeStructure?.markMatterCommissioningFailed(error: error)
         activeStructure = nil
+        if Self.isUserCancelled(error) {
+          NSLog("[GoogleHomeSharing] User cancelled (outer)")
+          result(FlutterError(
+            code: "CANCELLED",
+            message: "User cancelled Google Home commissioning.",
+            details: nil
+          ))
+          return
+        }
         cachedHome = nil
         NSLog("[GoogleHomeSharing] Error: %@", error.localizedDescription)
         result(FlutterError(
@@ -243,4 +259,28 @@ class GoogleHomeSharing {
     return MatterCommissioningUtils.matterSetupPayload(from: payload)
   }
   #endif
+
+  /// Detects whether an error represents a user-initiated cancellation of the
+  /// system commissioning UI. Walks the underlying error chain because
+  /// MatterSupport and GoogleHomeSDK frequently wrap the original cancel error.
+  static func isUserCancelled(_ error: Error) -> Bool {
+    var current: NSError? = error as NSError
+    while let err = current {
+      if err.domain == NSCocoaErrorDomain && err.code == NSUserCancelledError {
+        return true
+      }
+      if err.domain.contains("MatterSupport") && err.code == 1 {
+        return true
+      }
+      if err.domain == "HMErrorDomain" && err.code == 38 {
+        return true
+      }
+      if err.domain == NSPOSIXErrorDomain && err.code == 89 {
+        return true
+      }
+      current = err.userInfo[NSUnderlyingErrorKey] as? NSError
+    }
+    let msg = (error as NSError).localizedDescription.lowercased()
+    return msg.contains("cancel")
+  }
 }

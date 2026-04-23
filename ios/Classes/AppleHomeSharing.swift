@@ -39,6 +39,14 @@ class AppleHomeSharing {
         result(nil)
       } catch {
         NSLog("[AppleHomeSharing] Failed: %@", String(describing: error))
+        if GoogleHomeSharing.isUserCancelled(error) {
+          result(FlutterError(
+            code: "CANCELLED",
+            message: "User cancelled Apple Home sharing.",
+            details: nil
+          ))
+          return
+        }
         result(FlutterError(
           code: "SHARE_FAILED",
           message: error.localizedDescription,

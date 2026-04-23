@@ -49,7 +49,10 @@ enum MatterSharingErrorCode {
   /// Invalid or missing arguments passed to the platform method.
   invalidArgs,
 
-  /// User cancelled the commissioning UI (Android only).
+  /// User cancelled the commissioning UI.
+  ///
+  /// Thrown when the user closes the Google Home or Apple Home system sheet
+  /// without completing commissioning.
   cancelled,
 
   /// Google Play Services error (Android only).
