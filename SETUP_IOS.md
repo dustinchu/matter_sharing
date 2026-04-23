@@ -208,3 +208,5 @@ In the Matter specification this is called **Open Commissioning Window (OCW)**. 
 - Some devices open the window automatically on first boot (factory reset state)
 
 If the commissioning window is not open, the share will fail with `COMMISSION_FAILED` or `SHARE_FAILED`.
+
+If the user closes the Google Home or Apple Home system sheet without completing commissioning, the plugin throws `MatterSharingException` with code `MatterSharingErrorCode.cancelled` - treat this as a benign user action, not an error.

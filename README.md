@@ -189,7 +189,7 @@ try {
 | `commissionFailed` | `COMMISSION_FAILED` | iOS | Google Home commissioning failed |
 | `appleHomeFailed` | `SHARE_FAILED` | iOS | Apple Home sharing failed |
 | `googleHomeError` | `GOOGLE_HOME_ERROR` | Android | Google Play Services error |
-| `cancelled` | `CANCELLED` | Android | User cancelled the commissioning UI |
+| `cancelled` | `CANCELLED` | iOS/Android | User closed the Google Home / Apple Home system sheet |
 | `unsupported` | `UNSUPPORTED` | iOS | Requires iOS 16.1+ |
 | `unknown` | _(other)_ | iOS/Android | Unexpected error code |
 

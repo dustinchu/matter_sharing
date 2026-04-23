@@ -5,6 +5,11 @@ android/.gradle/
 .idea/
 build/
 
+# Swift Package Manager build artifacts
+.build/
+.swiftpm/
+Package.resolved
+
 # Google Home SDK - too large for git, download manually (see SETUP_IOS.md)
 ios/Frameworks/
 example/ios/Frameworks

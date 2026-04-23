@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4
+
+- iOS: Detect user cancellation of the Google Home and Apple Home system sheets and return `MatterSharingErrorCode.cancelled` instead of `commissionFailed` / `appleHomeFailed`. Matches Android behavior.
+- docs: `MatterSharingErrorCode.cancelled` is no longer Android-only; update README error table and SETUP guides.
+
 ## 0.1.3
 
 - docs: Add `alreadyCommissioned` error code to README error table and example.
