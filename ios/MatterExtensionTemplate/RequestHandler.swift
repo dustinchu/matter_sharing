@@ -9,12 +9,44 @@ private let appGroup = "group.YOUR_BUNDLE_ID"  // <-- CHANGE THIS
 @available(iOSApplicationExtension 16.1, *)
 class RequestHandler: MatterAddDeviceExtensionRequestHandler {
 
+  // One-time Home.configure() + restoreSession() in this extension process so
+  // GoogleHomeSDK can reuse the OAuth tokens already granted by the main app.
+  // Without this, the SDK inside the extension sees no session and re-prompts
+  // the user for Google Home permission a second time.
+  private static var didConfigureHome = false
+
   private func ud() -> UserDefaults? {
     return UserDefaults(suiteName: appGroup)
   }
 
   private func mode() -> String {
     return ud()?.string(forKey: "*#extCommissioningMode") ?? "legacy"
+  }
+
+  private func ensureHomeConfigured() async {
+    guard !Self.didConfigureHome else { return }
+
+    guard let info = Bundle.main.infoDictionary,
+          let teamID = info["MatterSharingTeamID"] as? String, !teamID.isEmpty,
+          let clientID = info["MatterSharingClientID"] as? String, !clientID.isEmpty,
+          let serverClientID = info["MatterSharingServerClientID"] as? String, !serverClientID.isEmpty,
+          let appGroupFromPlist = info["MatterSharingAppGroup"] as? String, !appGroupFromPlist.isEmpty
+    else {
+      NSLog("[MatterExt] Home.configure skipped: missing MatterSharing* keys in extension Info.plist")
+      return
+    }
+
+    await MainActor.run {
+      Home.configure {
+        $0.teamID = teamID
+        $0.clientID = clientID
+        $0.serverClientID = serverClientID
+        $0.sharedAppGroup = appGroupFromPlist
+      }
+    }
+    _ = await Home.restoreSession()
+    Self.didConfigureHome = true
+    NSLog("[MatterExt] Home.configure + restoreSession done")
   }
 
   override func validateDeviceCredential(
@@ -57,6 +89,7 @@ class RequestHandler: MatterAddDeviceExtensionRequestHandler {
     NSLog("[MatterExt] commissionDevice called, mode: %@", currentMode)
 
     if currentMode == "google" {
+      await ensureHomeConfigured()
       let commissioner = try HomeMatterCommissioner(appGroup: appGroup)
       try await commissioner.commissionMatterDevice(onboardingPayload: onboardingPayload)
     }
@@ -67,6 +100,7 @@ class RequestHandler: MatterAddDeviceExtensionRequestHandler {
     in home: MatterAddDeviceRequest.Home?
   ) async -> [MatterAddDeviceRequest.Room] {
     if mode() == "google" {
+      await ensureHomeConfigured()
       if let commissioner = try? HomeMatterCommissioner(appGroup: appGroup),
          let fetched = try? commissioner.fetchRooms(), !fetched.isEmpty {
         return fetched
@@ -88,6 +122,7 @@ class RequestHandler: MatterAddDeviceExtensionRequestHandler {
     in room: MatterAddDeviceRequest.Room?
   ) async {
     if mode() == "google" {
+      await ensureHomeConfigured()
       if let commissioner = try? HomeMatterCommissioner(appGroup: appGroup) {
         try? await commissioner.configureMatterDevice(deviceName: name, roomName: room?.displayName)
       }

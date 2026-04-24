@@ -21,8 +21,6 @@ class GoogleHomeSharing {
   #if canImport(GoogleHomeSDK)
   private var cachedHome: Home?
   private var activeStructure: Structure?
-  // Tracks the in-flight prepareForMatterCommissioning task so we don't call it twice
-  private var prepareTask: Task<Structure, Error>?
   #endif
 
   private init() {}
@@ -43,27 +41,6 @@ class GoogleHomeSharing {
         $0.sharedAppGroup = appGroup
       }
       NSLog("[GoogleHomeSharing] Home.configure() done")
-      // Eagerly restore session on app launch so connect() is not needed when user taps share
-      if cachedHome == nil {
-        cachedHome = await Home.restoreSession()
-        if let home = cachedHome {
-          NSLog("[GoogleHomeSharing] Session restored on configure")
-          // Warm up: fetch structures to surface any permission issues early
-          if let structures = try? await home.structures().list() {
-            NSLog("[GoogleHomeSharing] Warm-up structures count: %d", structures.count)
-            if let structure = structures.first {
-              // Pre-run prepareForMatterCommissioning so the OAuth scope is already granted
-              // before the user taps share, avoiding a second auth prompt at tap time.
-              prepareTask = Task {
-                NSLog("[GoogleHomeSharing] Pre-warming prepareForMatterCommissioning")
-                try await structure.prepareForMatterCommissioning()
-                NSLog("[GoogleHomeSharing] Pre-warm done")
-                return structure
-              }
-            }
-          }
-        }
-      }
     }
     #else
     NSLog("[GoogleHomeSharing] GoogleHomeSDK not linked - configure() is a no-op")
@@ -130,25 +107,8 @@ class GoogleHomeSharing {
           activeStructure = nil
         }
 
-        // Use the pre-warmed prepare result if available for the same structure,
-        // otherwise call prepareForMatterCommissioning now (this may show a second auth prompt
-        // on first install, but is unavoidable without a pre-warm).
-        if let task = prepareTask {
-          prepareTask = nil
-          let preWarmedStructure = try await task.value
-          // Only reuse if it's the same structure
-          if preWarmedStructure == structure {
-            NSLog("[GoogleHomeSharing] Using pre-warmed commissioning session")
-            activeStructure = preWarmedStructure
-          } else {
-            NSLog("[GoogleHomeSharing] Structure mismatch, calling prepareForMatterCommissioning")
-            try await structure.prepareForMatterCommissioning()
-            activeStructure = structure
-          }
-        } else {
-          try await structure.prepareForMatterCommissioning()
-          activeStructure = structure
-        }
+        try await structure.prepareForMatterCommissioning()
+        activeStructure = structure
         NSLog("[GoogleHomeSharing] prepareForMatterCommissioning done")
 
         let topology = MatterAddDeviceRequest.Topology(

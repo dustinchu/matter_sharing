@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.5
+
+- iOS: Fix duplicate Google Home permission prompt on first install. Extension process now calls `Home.configure()` + `Home.restoreSession()` before using `HomeMatterCommissioner`, so it reuses the OAuth session already granted by the main app.
+- iOS: Remove the `prepareForMatterCommissioning` pre-warm from `Home.configure()`. Pre-warm could race with the user-initiated share flow and cause `ASWebAuthenticationSession` continuation to be resumed twice, crashing the app.
+- docs: SETUP_IOS - document that the extension target's Info.plist must include the same `MatterSharing*` keys as the Runner target (extension runs in a separate process and reads its own Info.plist).
+
 ## 0.1.4
 
 - iOS: Detect user cancellation of the Google Home and Apple Home system sheets and return `MatterSharingErrorCode.cancelled` instead of `commissionFailed` / `appleHomeFailed`. Matches Android behavior.

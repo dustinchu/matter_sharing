@@ -150,6 +150,25 @@ In Xcode, add these files to the MatterExtension target:
 2. Select all three files from `ios/MatterExtension/`
 3. Make sure **Target Membership** is set to **MatterExtension only** (not Runner)
 
+### 4-4. Add the same `MatterSharing*` keys to the extension's Info.plist
+
+The extension runs in a separate process and reads **its own** `Info.plist`, not Runner's. If the keys are missing here, the extension cannot restore the Google Home OAuth session and the user will be prompted for Google Home permission **a second time** during commissioning.
+
+Open `ios/MatterExtension/Info.plist` and add the same four keys you will set in Step 5 for Runner:
+
+```xml
+<key>MatterSharingTeamID</key>
+<string>YOUR_APPLE_TEAM_ID</string>
+<key>MatterSharingClientID</key>
+<string>YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com</string>
+<key>MatterSharingServerClientID</key>
+<string>YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com</string>
+<key>MatterSharingAppGroup</key>
+<string>group.YOUR_BUNDLE_ID</string>
+```
+
+The values must be identical to Runner's so the extension's `GoogleHomeSDK` instance can find the session stored by the main app in the shared App Group.
+
 ---
 
 ## Step 5: Google Home Credentials (Google Home only)
