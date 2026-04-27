@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+- iOS: Fix `com.apple.MatterSupport` error 1 being misreported as `MatterSharingErrorCode.cancelled`. iOS uses the same code 1 for fabric conflicts (AddNOC err=7e), fail-safe timer expiry, and extension failures, so treating it as a cancel hid real commissioning failures from apps. Cancellation is now detected only from concrete underlying errors (`NSCocoaErrorDomain`/`NSUserCancelledError`, `HMErrorDomain` 38, POSIX `ECANCELED`). Affects both Google Home and Apple Home sharing.
+
 ## 0.1.5
 
 - iOS: Fix duplicate Google Home permission prompt on first install. Extension process now calls `Home.configure()` + `Home.restoreSession()` before using `HomeMatterCommissioner`, so it reuses the OAuth session already granted by the main app.
