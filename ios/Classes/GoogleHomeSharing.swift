@@ -223,13 +223,15 @@ class GoogleHomeSharing {
   /// Detects whether an error represents a user-initiated cancellation of the
   /// system commissioning UI. Walks the underlying error chain because
   /// MatterSupport and GoogleHomeSDK frequently wrap the original cancel error.
+  ///
+  /// IMPORTANT: `com.apple.MatterSupport` domain `code == 1` is NOT a reliable
+  /// cancel signal. iOS reports the same code for fabric conflicts, fail-safe
+  /// timer expiry, and extension failures. A real user cancel always has a
+  /// concrete underlying NSCocoa/HMError cancel in the chain.
   static func isUserCancelled(_ error: Error) -> Bool {
     var current: NSError? = error as NSError
     while let err = current {
       if err.domain == NSCocoaErrorDomain && err.code == NSUserCancelledError {
-        return true
-      }
-      if err.domain.contains("MatterSupport") && err.code == 1 {
         return true
       }
       if err.domain == "HMErrorDomain" && err.code == 38 {
@@ -240,7 +242,6 @@ class GoogleHomeSharing {
       }
       current = err.userInfo[NSUnderlyingErrorKey] as? NSError
     }
-    let msg = (error as NSError).localizedDescription.lowercased()
-    return msg.contains("cancel")
+    return false
   }
 }
